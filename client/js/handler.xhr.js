@@ -58,66 +58,73 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
     _upload: function(id){
         var file = this._files[id],
             name = this.getName(id),
-            size = this.getSize(id),
             self = this,
             url = this._options.endpoint,
             protocol = this._options.demoMode ? "GET" : "POST",
-            xhr, formData, paramName, key, params;
+            xhr, formData, key, params;
 
         this._options.onUpload(id, this.getName(id), true);
 
         this._loaded[id] = 0;
 
-        xhr = this._xhrs[id] = new XMLHttpRequest();
-
-        xhr.upload.onprogress = function(e){
-            if (e.lengthComputable){
-                self._loaded[id] = e.loaded;
-                self._options.onProgress(id, name, e.loaded, e.total);
-            }
-        };
-
-        xhr.onreadystatechange = function(){
-            if (xhr.readyState === 4){
-                self._onComplete(id, xhr);
-            }
-        };
-
-        params = this._options.paramsStore.getParams(id);
-
-        //build query string
-        if (!this._options.paramsInBody) {
-            params[this._options.inputName] = name;
-            url = qq.obj2url(params, this._options.endpoint);
+        if (this._options.enableChunking) {
+            this._uploadChunks(id);
         }
+        else {
+            xhr = this._xhrs[id] = new XMLHttpRequest();
 
-        xhr.open(protocol, url, true);
-        xhr.setRequestHeader("X-Requested-With", "XMLHttpRequest");
-        xhr.setRequestHeader("X-File-Name", encodeURIComponent(name));
-        xhr.setRequestHeader("Cache-Control", "no-cache");
-        if (this._options.forceMultipart || this._options.paramsInBody) {
-            formData = new FormData();
+            xhr.upload.onprogress = function(e){
+                if (e.lengthComputable){
+                    self._loaded[id] = e.loaded;
+                    self._options.onProgress(id, name, e.loaded, e.total);
+                }
+            };
 
-            if (this._options.paramsInBody) {
-                qq.obj2FormData(params, formData);
+            xhr.onreadystatechange = function(){
+                if (xhr.readyState === 4){
+                    self._onComplete(id, xhr);
+                }
+            };
+
+            params = this._options.paramsStore.getParams(id);
+
+            //build query string
+            if (!this._options.paramsInBody) {
+                params[this._options.inputName] = name;
+                url = qq.obj2url(params, this._options.endpoint);
             }
 
-            formData.append(this._options.inputName, file);
-            file = formData;
-        } else {
-            xhr.setRequestHeader("Content-Type", "application/octet-stream");
-            //NOTE: return mime type in xhr works on chrome 16.0.9 firefox 11.0a2
-            xhr.setRequestHeader("X-Mime-Type", file.type);
-        }
+            xhr.open(protocol, url, true);
+            xhr.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+            xhr.setRequestHeader("X-File-Name", encodeURIComponent(name));
+            xhr.setRequestHeader("Cache-Control", "no-cache");
+            if (this._options.forceMultipart || this._options.paramsInBody) {
+                formData = new FormData();
 
-        for (key in this._options.customHeaders){
-            if (this._options.customHeaders.hasOwnProperty(key)) {
-                xhr.setRequestHeader(key, this._options.customHeaders[key]);
+                if (this._options.paramsInBody) {
+                    qq.obj2FormData(params, formData);
+                }
+
+                formData.append(this._options.inputName, file);
+                file = formData;
+            } else {
+                xhr.setRequestHeader("Content-Type", "application/octet-stream");
+                //NOTE: return mime type in xhr works on chrome 16.0.9 firefox 11.0a2
+                xhr.setRequestHeader("X-Mime-Type", file.type);
             }
-        }
 
-        this.log('Sending upload request for ' + id);
-        xhr.send(file);
+            for (key in this._options.customHeaders){
+                if (this._options.customHeaders.hasOwnProperty(key)) {
+                    xhr.setRequestHeader(key, this._options.customHeaders[key]);
+                }
+            }
+
+            this.log('Sending upload request for ' + id);
+            xhr.send(file);
+        }
+    },
+    _uploadChunks: function(id) {
+
     },
     _onComplete: function(id, xhr){
         "use strict";
