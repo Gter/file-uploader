@@ -8,6 +8,8 @@ qq.UploadHandlerXhr = function(o){
     this._files = [];
     this._xhrs = [];
 
+    this._remainingChunks = [];
+
     // current loaded size in bytes for each file
     this._loaded = [];
 };
@@ -68,10 +70,11 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
         this._loaded[id] = 0;
 
         if (this._options.enableChunking) {
-            this._uploadChunks(id);
+            this._remainingChunks[id] = this._computeChunks(id);
+            this._uploadNextChunk(id);
         }
         else {
-            xhr = this._xhrs[id] = new XMLHttpRequest();
+            xhr = this._getXhr(id);
 
             xhr.upload.onprogress = function(e){
                 if (e.lengthComputable){
@@ -80,11 +83,7 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
                 }
             };
 
-            xhr.onreadystatechange = function(){
-                if (xhr.readyState === 4){
-                    self._onComplete(id, xhr);
-                }
-            };
+            xhr.onreadystatechange = this._getReadyStateChangeHandler(id, xhr);
 
             params = this._options.paramsStore.getParams(id);
 
@@ -123,8 +122,50 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
             xhr.send(file);
         }
     },
-    _uploadChunks: function(id) {
+    _uploadNextChunk: function(id) {
+        var chunkData = this._remainingChunks[id][0],
+            xhr = this._getXhr(id);
 
+        xhr.onreadystatechange = this._getReadyStateChangeHandler(id, xhr);
+
+
+    },
+    _computeChunks: function(id) {
+        var chunks = [],
+            chunkSize = this._options.chunkSize,
+            fileSize = this.getSize(id),
+            file = this._files[id],
+            getChunk = this._getBlobSliceFunc(file),
+            startBytes = 0,
+            endBytes = chunkSize >= fileSize ? fileSize-1 : chunkSize-1;
+
+        while (startBytes < fileSize) {
+            chunks.push({
+                start: startBytes,
+                end: endBytes,
+                blob: getChunk(startBytes, endBytes)
+            });
+
+            startBytes += chunkSize;
+            endBytes = startBytes+chunkSize >= fileSize ? fileSize-1 : startBytes+chunkSize;
+        }
+
+        return chunks;
+    },
+    _getBlobSliceFunc: function(file) {
+        return file.slice || file.mozSlice || file.webkitSlice;
+    },
+    _getXhr: function(id) {
+        return this._xhrs[id] = new XMLHttpRequest();
+    },
+    _getReadyStateChangeHandler: function(id, xhr) {
+        var self = this;
+
+        return function() {
+            if (xhr.readyState === 4) {
+                self._onComplete(id, xhr);
+            }
+        };
     },
     _onComplete: function(id, xhr){
         "use strict";
@@ -156,9 +197,23 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
                 return;
             }
         }
-
+        else {
+            if (this._options.enableChunking) {
+                this._remainingChunks[id].shift();
+                if (this._remainingChunks[id].length) {
+                    this._uploadNextChunk(id);
+                }
+                else {
+                    this._completeUpload(id, name, response, xhr);
+                }
+            }
+            else {
+                this._completeUpload(id, name, response, xhr);
+            }
+        }
+    },
+    _completeUpload: function(id, name, response, xhr) {
         this._options.onComplete(id, name, response, xhr);
-
         this._xhrs[id] = null;
         this._dequeue(id);
     },
