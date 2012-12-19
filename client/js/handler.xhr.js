@@ -63,7 +63,7 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
             self = this,
             url = this._options.endpoint,
             protocol = this._options.demoMode ? "GET" : "POST",
-            xhr, formData, key, params;
+            xhr, params, toSend;
 
         this._options.onUpload(id, this.getName(id), true);
 
@@ -86,49 +86,35 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
             xhr.onreadystatechange = this._getReadyStateChangeHandler(id, xhr);
 
             params = this._options.paramsStore.getParams(id);
-
-            //build query string
-            if (!this._options.paramsInBody) {
-                params[this._options.inputName] = name;
-                url = qq.obj2url(params, this._options.endpoint);
-            }
-
-            xhr.open(protocol, url, true);
-            xhr.setRequestHeader("X-Requested-With", "XMLHttpRequest");
-            xhr.setRequestHeader("X-File-Name", encodeURIComponent(name));
-            xhr.setRequestHeader("Cache-Control", "no-cache");
-            if (this._options.forceMultipart || this._options.paramsInBody) {
-                formData = new FormData();
-
-                if (this._options.paramsInBody) {
-                    qq.obj2FormData(params, formData);
-                }
-
-                formData.append(this._options.inputName, file);
-                file = formData;
-            } else {
-                xhr.setRequestHeader("Content-Type", "application/octet-stream");
-                //NOTE: return mime type in xhr works on chrome 16.0.9 firefox 11.0a2
-                xhr.setRequestHeader("X-Mime-Type", file.type);
-            }
-
-            for (key in this._options.customHeaders){
-                if (this._options.customHeaders.hasOwnProperty(key)) {
-                    xhr.setRequestHeader(key, this._options.customHeaders[key]);
-                }
-            }
+            toSend = this._setParamsAndGetEntityToSend(params, xhr, protocol, file, url, name);
+            this._setHeaders(this._options.customHeaders, xhr, name, this._options.forceMultipart, this._options.paramsInBody);
 
             this.log('Sending upload request for ' + id);
-            xhr.send(file);
+            xhr.send(toSend);
         }
     },
     _uploadNextChunk: function(id) {
         var chunkData = this._remainingChunks[id][0],
-            xhr = this._getXhr(id);
+            xhr = this._getXhr(id),
+            size = this.getSize(id),
+            self = this,
+            name = this.getName(id),
+            toSend;
 
         xhr.onreadystatechange = this._getReadyStateChangeHandler(id, xhr);
 
+        xhr.upload.onprogress = function(e) {
+            if (e.lengthComputable) {
+                var totalLoaded = e.loaded + self._loaded[id];
+                self._options.onProgress(id, name, totalLoaded, size);
+            }
+        };
 
+        //TODO build & set params
+        //TODO set headers
+
+        this.log('Sending chunked upload request for ' + id + ": bytes " + chunkData.start + "-" + chunkData.end + " of " + size);
+        xhr.send(toSend);
     },
     _computeChunks: function(id) {
         var chunks = [],
@@ -167,6 +153,42 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
             }
         };
     },
+    _setParamsAndGetEntityToSend: function(params, xhr, protocol, file, url, name) {
+        var formData = new FormData();
+
+        //build query string
+        if (!this._options.paramsInBody) {
+            params[this._options.inputName] = name;
+            url = qq.obj2url(params, this._options.endpoint);
+        }
+
+        xhr.open(protocol, url, true);
+        if (this._options.forceMultipart || this._options.paramsInBody) {
+            if (this._options.paramsInBody) {
+                qq.obj2FormData(params, formData);
+            }
+
+            formData.append(this._options.inputName, file);
+            return formData;
+        }
+
+        return file;
+    },
+    _setHeaders: function(extraHeaders, xhr, name, forceMultipart, paramsInBody) {
+        xhr.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+        xhr.setRequestHeader("X-File-Name", encodeURIComponent(name));
+        xhr.setRequestHeader("Cache-Control", "no-cache");
+
+        if (!forceMultipart && !paramsInBody) {
+            xhr.setRequestHeader("Content-Type", "application/octet-stream");
+            //NOTE: return mime type in xhr works on chrome 16.0.9 firefox 11.0a2
+            xhr.setRequestHeader("X-Mime-Type", file.type);
+        }
+
+        qq.each(extraHeaders, function(name, val) {
+            xhr.setRequestHeader(name, val);
+        });
+    },
     _onComplete: function(id, xhr){
         "use strict";
         // the request was aborted/cancelled
@@ -197,22 +219,26 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
                 return;
             }
         }
+        else if (this._options.enableChunking) {
+            this._onCompleteChunk(id, name, response, xhr);
+        }
         else {
-            if (this._options.enableChunking) {
-                this._remainingChunks[id].shift();
-                if (this._remainingChunks[id].length) {
-                    this._uploadNextChunk(id);
-                }
-                else {
-                    this._completeUpload(id, name, response, xhr);
-                }
-            }
-            else {
-                this._completeUpload(id, name, response, xhr);
-            }
+            this._completed(id, name, response, xhr);
         }
     },
-    _completeUpload: function(id, name, response, xhr) {
+    _onCompleteChunk: function(id, name, response, xhr) {
+        var chunk = this._remainingChunks[id].shift();
+
+        this._loaded[id] += chunk.end - chunk.start;
+
+        if (this._remainingChunks[id].length) {
+            this._uploadNextChunk(id);
+        }
+        else {
+            this._completed(id, name, response, xhr);
+        }
+    },
+    _completed: function(id, name, response, xhr) {
         this._options.onComplete(id, name, response, xhr);
         this._xhrs[id] = null;
         this._dequeue(id);
@@ -226,5 +252,7 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
             this._xhrs[id].abort();
             this._xhrs[id] = null;
         }
+
+        this._remainingChunks[id] = [];
     }
 });
