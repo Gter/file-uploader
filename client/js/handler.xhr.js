@@ -62,14 +62,15 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
             name = this.getName(id),
             self = this,
             url = this._options.endpoint,
-            protocol = this._options.demoMode ? "GET" : "POST",
-            xhr, params, toSend;
+            xhr,
+            params,
+            toSend;
 
         this._options.onUpload(id, this.getName(id), true);
 
         this._loaded[id] = 0;
 
-        if (this._options.enableChunking) {
+        if (this._options.chunking.enabled) {
             this._remainingChunks[id] = this._computeChunks(id);
             this._uploadNextChunk(id);
         }
@@ -86,8 +87,8 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
             xhr.onreadystatechange = this._getReadyStateChangeHandler(id, xhr);
 
             params = this._options.paramsStore.getParams(id);
-            toSend = this._setParamsAndGetEntityToSend(params, xhr, protocol, file, url, name);
-            this._setHeaders(this._options.customHeaders, xhr, name, this._options.forceMultipart, this._options.paramsInBody);
+            toSend = this._setParamsAndGetEntityToSend(params, xhr, file, id);
+            this._setHeaders(xhr);
 
             this.log('Sending upload request for ' + id);
             xhr.send(toSend);
@@ -99,6 +100,7 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
             size = this.getSize(id),
             self = this,
             name = this.getName(id),
+            params = this._options.paramsStore.getParams(id),
             toSend;
 
         xhr.onreadystatechange = this._getReadyStateChangeHandler(id, xhr);
@@ -110,23 +112,32 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
             }
         };
 
-        //TODO build & set params
-        //TODO set headers
+        //chunking-specific params
+        params[this._options.chunking.paramNames.partNumber] = chunkData.part;
+        params[this._options.chunking.paramNames.partByteOffset] = chunkData.start;
+        params[this._options.chunking.paramNames.chunkSize] = chunkData.start - chunkData.end;
+        params[this._options.chunking.paramNames.totalFileSize] = size;
+        params[this._options.chunking.paramNames.isLastPart] = this._remainingChunks[id].length === 1;
+
+        toSend = this._setParamsAndGetEntityToSend(params, xhr, chunkData.blob, id);
+        this._setHeaders(xhr);
 
         this.log('Sending chunked upload request for ' + id + ": bytes " + chunkData.start + "-" + chunkData.end + " of " + size);
         xhr.send(toSend);
     },
     _computeChunks: function(id) {
         var chunks = [],
-            chunkSize = this._options.chunkSize,
+            chunkSize = this._options.chunking.partSize,
             fileSize = this.getSize(id),
             file = this._files[id],
             getChunk = this._getBlobSliceFunc(file),
             startBytes = 0,
+            part = -1,
             endBytes = chunkSize >= fileSize ? fileSize-1 : chunkSize-1;
 
         while (startBytes < fileSize) {
             chunks.push({
+                part: part + 1,
                 start: startBytes,
                 end: endBytes,
                 blob: getChunk(startBytes, endBytes)
@@ -153,8 +164,11 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
             }
         };
     },
-    _setParamsAndGetEntityToSend: function(params, xhr, protocol, file, url, name) {
-        var formData = new FormData();
+    _setParamsAndGetEntityToSend: function(params, xhr, fileOrBlob, id) {
+        var formData = new FormData(),
+            protocol = this._options.demoMode ? "GET" : "POST",
+            url = this._options.endpoint,
+            name = this.getName(id);
 
         //build query string
         if (!this._options.paramsInBody) {
@@ -168,13 +182,18 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
                 qq.obj2FormData(params, formData);
             }
 
-            formData.append(this._options.inputName, file);
+            formData.append(this._options.inputName, fileOrBlob);
             return formData;
         }
 
-        return file;
+        return fileOrBlob;
     },
-    _setHeaders: function(extraHeaders, xhr, name, forceMultipart, paramsInBody) {
+    _setHeaders: function(xhr) {
+        var extraHeaders = this._options.customHeaders,
+            name = this.getName(id),
+            forceMultipart = this._options.forceMultipart,
+            paramsInBody = this._options.paramsInBody;
+
         xhr.setRequestHeader("X-Requested-With", "XMLHttpRequest");
         xhr.setRequestHeader("X-File-Name", encodeURIComponent(name));
         xhr.setRequestHeader("Cache-Control", "no-cache");
@@ -219,15 +238,16 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
                 return;
             }
         }
-        else if (this._options.enableChunking) {
-            this._onCompleteChunk(id, name, response, xhr);
+        else if (this._options.chunking.enabled) {
+            this._onCompleteChunk(id, response, xhr);
         }
         else {
-            this._completed(id, name, response, xhr);
+            this._completed(id, response, xhr);
         }
     },
-    _onCompleteChunk: function(id, name, response, xhr) {
-        var chunk = this._remainingChunks[id].shift();
+    _onCompleteChunk: function(id, response, xhr) {
+        var chunk = this._remainingChunks[id].shift(),
+            name = this.getName(id);
 
         this._loaded[id] += chunk.end - chunk.start;
 
@@ -238,7 +258,9 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
             this._completed(id, name, response, xhr);
         }
     },
-    _completed: function(id, name, response, xhr) {
+    _completed: function(id, response, xhr) {
+        var name = this.getName(id);
+
         this._options.onComplete(id, name, response, xhr);
         this._xhrs[id] = null;
         this._dequeue(id);

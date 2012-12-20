@@ -9,6 +9,17 @@ qq.UploadHandlerAbstract = function(o){
         paramsInBody: false,
         // maximum number of concurrent uploads
         maxConnections: 999,
+        chunking: {
+            enabled: false,
+            partSize: 2000000,
+            paramNames: {
+                partNumber: 'qqPartNum',
+                partByteOffset: 'qqPartByteOffset',
+                chunkSize: 'qqChunkSize',
+                totalFileSize: 'qqTotalFileSize',
+                isLastPart: 'qqIsLastPart'
+            }
+        },
         log: function(str, level) {},
         onProgress: function(id, fileName, loaded, total){},
         onComplete: function(id, fileName, response, xhr){},
