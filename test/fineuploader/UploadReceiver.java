@@ -12,7 +12,9 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.net.URLDecoder;
+import java.util.Arrays;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 public class UploadReceiver extends HttpServlet
 {
@@ -54,7 +56,7 @@ public class UploadReceiver extends HttpServlet
                     String decodedVal = URLDecoder.decode(paramEntry.getValue(), "UTF-8");
                     System.out.println("For File: " + requestParser.getFilename() +  "Key: " + decodedKey + ", Val: " + decodedVal);
                 }
-                doWriteTempFileForPostRequest(requestParser);
+                doWriteTempFileForPostRequest(requestParser, req, multipartUploadParser);
                 writeResponse(resp.getWriter(), requestParser.generateError() ? "Generated error" : null);
             }
             else
@@ -71,10 +73,87 @@ public class UploadReceiver extends HttpServlet
     }
 
 
-    private void doWriteTempFileForPostRequest(RequestParser requestParser) throws Exception
+    private void doWriteTempFileForPostRequest(RequestParser requestParser, HttpServletRequest req, MultipartUploadParser multipartUploadParser) throws Exception
     {
-        writeToTempFile(requestParser.getUploadItem().getInputStream(), new File(UPLOAD_DIR, requestParser.getFilename()), null);
+        if (multipartUploadParser != null)
+        {
+            String partNum = multipartUploadParser.getParams().get("qqpartnum");
+            if (partNum != null)
+            {
+                String originalFilename = URLDecoder.decode(req.getHeader("X-File-Name"), "UTF-8");
+                writeToTempFile(requestParser.getUploadItem().getInputStream(), new File(UPLOAD_DIR, originalFilename + "_" + partNum), null);
+
+                if (Boolean.parseBoolean(multipartUploadParser.getParams().get("qqislastpart")))
+                {
+                    File[] parts = getPartitionFiles(UPLOAD_DIR, originalFilename);
+                    for (File part : parts)
+                    {
+                        mergeFiles(originalFilename, part);
+                    }
+                    deletePartitionFiles(UPLOAD_DIR, originalFilename);
+                }
+            }
+            else
+            {
+                writeToTempFile(requestParser.getUploadItem().getInputStream(), new File(UPLOAD_DIR, requestParser.getFilename()), null);
+            }
+        }
     }
+
+    private static class PartitionFilesFilter implements FilenameFilter
+    {
+        private String filename;
+        PartitionFilesFilter(String filename)
+        {
+            this.filename = filename;
+        }
+
+        @Override
+        public boolean accept(File file, String s)
+        {
+            return s.matches(Pattern.quote(filename) + "_\\d+");
+        }
+    }
+
+    private static File[] getPartitionFiles(File directory, String filename)
+    {
+        File[] files = directory.listFiles(new PartitionFilesFilter(filename));
+        Arrays.sort(files);
+        return files;
+    }
+
+    private static void deletePartitionFiles(File directory, String filename)
+    {
+        File[] partFiles = getPartitionFiles(directory, filename);
+        for (File partFile : partFiles)
+        {
+            partFile.delete();
+        }
+    }
+
+    private File mergeFiles(String filename, File partFile) throws Exception
+   	{
+   		File outputFile = new File(UPLOAD_DIR, filename);
+   		FileOutputStream fos;
+   		FileInputStream fis;
+   		byte[] fileBytes;
+   		int bytesRead = 0;
+   		fos = new FileOutputStream(outputFile, true);
+   		fis = new FileInputStream(partFile);
+   		fileBytes = new byte[(int) partFile.length()];
+   		bytesRead = fis.read(fileBytes, 0,(int)  partFile.length());
+   		assert(bytesRead == fileBytes.length);
+   		assert(bytesRead == (int) partFile.length());
+   		fos.write(fileBytes);
+   		fos.flush();
+   		fileBytes = null;
+   		fis.close();
+   		fis = null;
+   		fos.close();
+   		fos = null;
+
+   		return outputFile;
+   	}
 
     private File writeToTempFile(InputStream in, File out, Long expectedFileSize) throws IOException
     {

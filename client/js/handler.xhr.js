@@ -88,7 +88,7 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
 
             params = this._options.paramsStore.getParams(id);
             toSend = this._setParamsAndGetEntityToSend(params, xhr, file, id);
-            this._setHeaders(xhr);
+            this._setHeaders(id, xhr);
 
             this.log('Sending upload request for ' + id);
             xhr.send(toSend);
@@ -115,12 +115,12 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
         //chunking-specific params
         params[this._options.chunking.paramNames.partNumber] = chunkData.part;
         params[this._options.chunking.paramNames.partByteOffset] = chunkData.start;
-        params[this._options.chunking.paramNames.chunkSize] = chunkData.start - chunkData.end;
+        params[this._options.chunking.paramNames.chunkSize] = chunkData.end - chunkData.start;
         params[this._options.chunking.paramNames.totalFileSize] = size;
         params[this._options.chunking.paramNames.isLastPart] = this._remainingChunks[id].length === 1;
 
         toSend = this._setParamsAndGetEntityToSend(params, xhr, chunkData.blob, id);
-        this._setHeaders(xhr);
+        this._setHeaders(id, xhr);
 
         this.log('Sending chunked upload request for ' + id + ": bytes " + chunkData.start + "-" + chunkData.end + " of " + size);
         xhr.send(toSend);
@@ -130,27 +130,38 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
             chunkSize = this._options.chunking.partSize,
             fileSize = this.getSize(id),
             file = this._files[id],
-            getChunk = this._getBlobSliceFunc(file),
             startBytes = 0,
             part = -1,
-            endBytes = chunkSize >= fileSize ? fileSize-1 : chunkSize-1;
+            endBytes = chunkSize >= fileSize ? fileSize : chunkSize,
+            chunk;
 
         while (startBytes < fileSize) {
+            chunk = this._getChunk(file, startBytes, endBytes);
+            part+=1;
+
             chunks.push({
-                part: part + 1,
+                part: part,
                 start: startBytes,
                 end: endBytes,
-                blob: getChunk(startBytes, endBytes)
+                blob: chunk
             });
 
             startBytes += chunkSize;
-            endBytes = startBytes+chunkSize >= fileSize ? fileSize-1 : startBytes+chunkSize;
+            endBytes = startBytes+chunkSize >= fileSize ? fileSize : startBytes+chunkSize;
         }
 
         return chunks;
     },
-    _getBlobSliceFunc: function(file) {
-        return file.slice || file.mozSlice || file.webkitSlice;
+    _getChunk: function(file, startByte, endByte) {
+        if (file.slice) {
+            return file.slice(startByte, endByte);
+        }
+        else if (file.mozSlice) {
+            return file.mozSlice(startByte, endByte);
+        }
+        else if (file.webkitSlice) {
+            return file.webkitSlice(startByte, endByte);
+        }
     },
     _getXhr: function(id) {
         return this._xhrs[id] = new XMLHttpRequest();
@@ -188,11 +199,12 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
 
         return fileOrBlob;
     },
-    _setHeaders: function(xhr) {
+    _setHeaders: function(id, xhr) {
         var extraHeaders = this._options.customHeaders,
             name = this.getName(id),
             forceMultipart = this._options.forceMultipart,
-            paramsInBody = this._options.paramsInBody;
+            paramsInBody = this._options.paramsInBody,
+            file = this._files[id];
 
         xhr.setRequestHeader("X-Requested-With", "XMLHttpRequest");
         xhr.setRequestHeader("X-File-Name", encodeURIComponent(name));
@@ -255,7 +267,7 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
             this._uploadNextChunk(id);
         }
         else {
-            this._completed(id, name, response, xhr);
+            this._completed(id, response, xhr);
         }
     },
     _completed: function(id, response, xhr) {
