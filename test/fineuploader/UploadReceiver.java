@@ -75,15 +75,16 @@ public class UploadReceiver extends HttpServlet
 
     private void doWriteTempFileForMultipartRequest(RequestParser requestParser, HttpServletRequest req, MultipartUploadParser multipartUploadParser) throws Exception
     {
-        String partNum = multipartUploadParser.getParams().get("qqpartnum");
-        if (partNum != null)
+        String partNumStr = multipartUploadParser.getParams().get("qqpartnum");
+        if (partNumStr != null)
         {
+            int partNum = Integer.parseInt(partNumStr);
             int totalParts = Integer.parseInt(multipartUploadParser.getParams().get("qqtotalparts"));
 
             String originalFilename = URLDecoder.decode(multipartUploadParser.getParams().get("qqfilename"), "UTF-8");
-            writeToTempFile(requestParser.getUploadItem().getInputStream(), new File(UPLOAD_DIR, originalFilename + "_" + String.format("%05d", Integer.parseInt(partNum))), null);
+            writeToTempFile(requestParser.getUploadItem().getInputStream(), new File(UPLOAD_DIR, originalFilename + "_" + String.format("%05d", partNum)), null);
 
-            if (totalParts-1 == Integer.parseInt(partNum))
+            if (totalParts-1 == partNum)
             {
                 File[] parts = getPartitionFiles(UPLOAD_DIR, originalFilename);
                 for (File part : parts)
@@ -145,11 +146,8 @@ public class UploadReceiver extends HttpServlet
    		assert(bytesRead == (int) partFile.length());
    		fos.write(fileBytes);
    		fos.flush();
-   		fileBytes = null;
    		fis.close();
-   		fis = null;
    		fos.close();
-   		fos = null;
 
    		return outputFile;
    	}
