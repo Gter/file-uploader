@@ -50,12 +50,6 @@ public class UploadReceiver extends HttpServlet
             {
                 MultipartUploadParser multipartUploadParser = new MultipartUploadParser(req, TEMP_DIR, getServletContext());
                 requestParser = RequestParser.getInstance(req, multipartUploadParser);
-                for (Map.Entry<String, String> paramEntry: multipartUploadParser.getParams().entrySet())
-                {
-                    String decodedKey = URLDecoder.decode(paramEntry.getKey(), "UTF-8");
-                    String decodedVal = URLDecoder.decode(paramEntry.getValue(), "UTF-8");
-                    System.out.println("For File: " + requestParser.getFilename() +  "Key: " + decodedKey + ", Val: " + decodedVal);
-                }
                 doWriteTempFileForMultipartRequest(requestParser, req, multipartUploadParser);
                 writeResponse(resp.getWriter(), requestParser.generateError() ? "Generated error" : null);
             }
