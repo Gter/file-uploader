@@ -13,7 +13,6 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.net.URLDecoder;
 import java.util.Arrays;
-import java.util.Map;
 import java.util.regex.Pattern;
 
 public class UploadReceiver extends HttpServlet
