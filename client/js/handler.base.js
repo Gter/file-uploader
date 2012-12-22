@@ -13,11 +13,12 @@ qq.UploadHandlerAbstract = function(o){
             enabled: false,
             partSize: 2000000,
             paramNames: {
-                partNumber: 'qqPartNum',
-                partByteOffset: 'qqPartByteOffset',
-                chunkSize: 'qqChunkSize',
-                totalFileSize: 'qqTotalFileSize',
-                isLastPart: 'qqIsLastPart'
+                partNumber: 'qqpartnum',
+                partByteOffset: 'qqpartbyteoffset',
+                chunkSize: 'qqchunksize',
+                totalFileSize: 'qqtotalfilesize',
+                totalParts: 'qqtotalparts',
+                filename: 'qqfilename'
             }
         },
         log: function(str, level) {},

@@ -14,9 +14,8 @@ qq.extend(qq.UploadHandlerForm.prototype, qq.UploadHandlerAbstract.prototype);
 qq.extend(qq.UploadHandlerForm.prototype, {
     add: function(fileInput){
         fileInput.setAttribute('name', this._options.inputName);
-        var id = qq.getUniqueId();
 
-        this._inputs[id] = fileInput;
+        var id = this._inputs.push(fileInput) - 1;
 
         // remove file input from DOM
         if (fileInput.parentNode){

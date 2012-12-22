@@ -56,7 +56,7 @@ public class UploadReceiver extends HttpServlet
                     String decodedVal = URLDecoder.decode(paramEntry.getValue(), "UTF-8");
                     System.out.println("For File: " + requestParser.getFilename() +  "Key: " + decodedKey + ", Val: " + decodedVal);
                 }
-                doWriteTempFileForPostRequest(requestParser, req, multipartUploadParser);
+                doWriteTempFileForMultipartRequest(requestParser, req, multipartUploadParser);
                 writeResponse(resp.getWriter(), requestParser.generateError() ? "Generated error" : null);
             }
             else
@@ -73,30 +73,29 @@ public class UploadReceiver extends HttpServlet
     }
 
 
-    private void doWriteTempFileForPostRequest(RequestParser requestParser, HttpServletRequest req, MultipartUploadParser multipartUploadParser) throws Exception
+    private void doWriteTempFileForMultipartRequest(RequestParser requestParser, HttpServletRequest req, MultipartUploadParser multipartUploadParser) throws Exception
     {
-        if (multipartUploadParser != null)
+        String partNum = multipartUploadParser.getParams().get("qqpartnum");
+        if (partNum != null)
         {
-            String partNum = multipartUploadParser.getParams().get("qqpartnum");
-            if (partNum != null)
-            {
-                String originalFilename = URLDecoder.decode(req.getHeader("X-File-Name"), "UTF-8");
-                writeToTempFile(requestParser.getUploadItem().getInputStream(), new File(UPLOAD_DIR, originalFilename + "_" + partNum), null);
+            int totalParts = Integer.parseInt(multipartUploadParser.getParams().get("qqtotalparts"));
 
-                if (Boolean.parseBoolean(multipartUploadParser.getParams().get("qqislastpart")))
-                {
-                    File[] parts = getPartitionFiles(UPLOAD_DIR, originalFilename);
-                    for (File part : parts)
-                    {
-                        mergeFiles(originalFilename, part);
-                    }
-                    deletePartitionFiles(UPLOAD_DIR, originalFilename);
-                }
-            }
-            else
+            String originalFilename = URLDecoder.decode(multipartUploadParser.getParams().get("qqfilename"), "UTF-8");
+            writeToTempFile(requestParser.getUploadItem().getInputStream(), new File(UPLOAD_DIR, originalFilename + "_" + String.format("%05d", Integer.parseInt(partNum))), null);
+
+            if (totalParts-1 == Integer.parseInt(partNum))
             {
-                writeToTempFile(requestParser.getUploadItem().getInputStream(), new File(UPLOAD_DIR, requestParser.getFilename()), null);
+                File[] parts = getPartitionFiles(UPLOAD_DIR, originalFilename);
+                for (File part : parts)
+                {
+                    mergeFiles(originalFilename, part);
+                }
+                deletePartitionFiles(UPLOAD_DIR, originalFilename);
             }
+        }
+        else
+        {
+            writeToTempFile(requestParser.getUploadItem().getInputStream(), new File(UPLOAD_DIR, requestParser.getFilename()), null);
         }
     }
 

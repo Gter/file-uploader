@@ -202,6 +202,12 @@ qq.isFolderDropSupported = function(dataTransfer) {
     return (dataTransfer.items && dataTransfer.items[0].webkitGetAsEntry);
 };
 
+qq.isFileChunkingSupported = function() {
+    "use strict";
+    return qq.isXhrUploadSupported() &&
+        (File.prototype.slice || File.prototype.webkitSlice || File.prototype.mozSlice);
+};
+
 qq.extend = function (first, second, extendNested) {
     "use strict";
     qq.each(second, function(prop, val) {
@@ -246,11 +252,10 @@ qq.indexOf = function(arr, elt, from){
 qq.getUniqueId = (function(){
     "use strict";
 
-    var id = -1;
-    return function(){
-        id += 1;
-        return id;
-    };
+    'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random()*16|0, v = c == 'x' ? r : (r&0x3|0x8);
+        return v.toString(16);
+    });
 }());
 
 //

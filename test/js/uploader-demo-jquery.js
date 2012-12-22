@@ -24,7 +24,14 @@ $(document).ready(function() {
                     fileNum+=1;
                     return fileNum;
                 }
+            },
+            chunking: {
+                enabled: true
             }
+        },
+        retry: {
+            enableAuto: true,
+            showButton: true
         }
     })
         .on('error', errorHandler);

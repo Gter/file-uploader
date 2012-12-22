@@ -53,6 +53,7 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
         this._files = [];
         this._xhrs = [];
         this._loaded = [];
+        this._remainingChunks = []
     },
     /**
      * Sends the file identified by id to the server
@@ -70,8 +71,11 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
 
         this._loaded[id] = 0;
 
-        if (this._options.chunking.enabled) {
-            this._remainingChunks[id] = this._computeChunks(id);
+        if (this._options.chunking.enabled && qq.isFileChunkingSupported()) {
+            if (!this._remainingChunks[id] || this._remainingChunks[id].length === 0) {
+                this._remainingChunks[id] = this._computeChunks(id);
+            }
+
             this._uploadNextChunk(id);
         }
         else {
@@ -112,18 +116,32 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
             }
         };
 
-        //chunking-specific params
-        params[this._options.chunking.paramNames.partNumber] = chunkData.part;
-        params[this._options.chunking.paramNames.partByteOffset] = chunkData.start;
-        params[this._options.chunking.paramNames.chunkSize] = chunkData.end - chunkData.start;
-        params[this._options.chunking.paramNames.totalFileSize] = size;
-        params[this._options.chunking.paramNames.isLastPart] = this._remainingChunks[id].length === 1;
+        this._addChunkingSpecificParams(id, params);
 
         toSend = this._setParamsAndGetEntityToSend(params, xhr, chunkData.blob, id);
         this._setHeaders(id, xhr);
 
         this.log('Sending chunked upload request for ' + id + ": bytes " + chunkData.start + "-" + chunkData.end + " of " + size);
         xhr.send(toSend);
+    },
+    _addChunkingSpecificParams: function(id, params) {
+        var chunkData = this._remainingChunks[id][0],
+            size = this.getSize(id),
+            name = this.getName(id);
+
+        params[this._options.chunking.paramNames.partNumber] = chunkData.part;
+        params[this._options.chunking.paramNames.partByteOffset] = chunkData.start;
+        params[this._options.chunking.paramNames.chunkSize] = chunkData.end - chunkData.start;
+        params[this._options.chunking.paramNames.totalParts] = chunkData.count;
+        params[this._options.chunking.paramNames.totalFileSize] = size;
+
+        /**
+         * When a Blob is sent in a multipart request, the filename value in the content-disposition header is either "blob"
+         * or an empty string.  So, we will need to include the actual file name as a param in this case.
+         */
+        if (this._options.forceMultipart || this._options.paramsInBody) {
+            params[this._options.chunking.paramNames.filename] = name;
+        }
     },
     _computeChunks: function(id) {
         var chunks = [],
@@ -133,6 +151,7 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
             startBytes = 0,
             part = -1,
             endBytes = chunkSize >= fileSize ? fileSize : chunkSize,
+            totalChunks = Math.ceil(fileSize / chunkSize),
             chunk;
 
         while (startBytes < fileSize) {
@@ -143,6 +162,7 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
                 part: part,
                 start: startBytes,
                 end: endBytes,
+                count: totalChunks,
                 blob: chunk
             });
 
@@ -229,7 +249,9 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
         var size = this.getSize(id);
         var response; //the parsed JSON response from the server, or the empty object if parsing failed.
 
-        this._options.onProgress(id, name, size, size);
+        if (!this._options.chunking.enabled || this._remainingChunks[id].length === 1) {
+            this._options.onProgress(id, name, size, size);
+        }
 
         this.log("xhr - server response received for " + id);
         this.log("responseText = " + xhr.responseText);
@@ -249,21 +271,24 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
             if (this._options.onAutoRetry(id, name, response, xhr)) {
                 return;
             }
+            else {
+                this._completed(id, response, xhr);
+            }
         }
         else if (this._options.chunking.enabled) {
-            this._onCompleteChunk(id, response, xhr);
+            this._onSuccessfullyCompletedChunk(id, response, xhr);
         }
         else {
             this._completed(id, response, xhr);
         }
     },
-    _onCompleteChunk: function(id, response, xhr) {
+    _onSuccessfullyCompletedChunk: function(id, response, xhr) {
         var chunk = this._remainingChunks[id].shift(),
             name = this.getName(id);
 
         this._loaded[id] += chunk.end - chunk.start;
 
-        if (this._remainingChunks[id].length) {
+        if (this._remainingChunks[id].length > 0) {
             this._uploadNextChunk(id);
         }
         else {

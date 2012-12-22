@@ -13,7 +13,19 @@ qq.FineUploaderBasic = function(o){
             paramsInBody: false,
             customHeaders: {},
             forceMultipart: false,
-            inputName: 'qqfile'
+            inputName: 'qqfile',
+            chunking: {
+                enabled: false,
+                partSize: 2000000,
+                paramNames: {
+                    partNumber: 'qqpartnum',
+                    partByteOffset: 'qqpartbyteoffset',
+                    chunkSize: 'qqchunksize',
+                    totalFileSize: 'qqtotalfilesize',
+                    totalParts: 'qqtotalparts',
+                    filename: 'qqfilename'
+                }
+            }
         },
         validation: {
             allowedExtensions: [],
@@ -193,6 +205,7 @@ qq.FineUploaderBasic.prototype = {
             log: this.log,
             paramsInBody: this._options.request.paramsInBody,
             paramsStore: this._paramsStore,
+            chunking: this._options.request.chunking,
             onProgress: function(id, fileName, loaded, total){
                 self._onProgress(id, fileName, loaded, total);
                 self._options.callbacks.onProgress(id, fileName, loaded, total);
