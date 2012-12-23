@@ -72,17 +72,18 @@ public class UploadReceiver extends HttpServlet
         {
             int partNum = Integer.parseInt(partNumStr);
             int totalParts = Integer.parseInt(req.getParameter("qqtotalparts"));
+            String uuid = req.getParameter("qquuid");
 
-            writeFile(req.getInputStream(), new File(UPLOAD_DIR, requestParser.getFilename() + "_" + String.format("%05d", partNum)), null);
+            writeFile(req.getInputStream(), new File(UPLOAD_DIR, uuid + "_" + String.format("%05d", partNum)), null);
 
             if (totalParts-1 == partNum)
             {
-                File[] parts = getPartitionFiles(UPLOAD_DIR, requestParser.getFilename());
+                File[] parts = getPartitionFiles(UPLOAD_DIR, uuid);
                 for (File part : parts)
                 {
                     mergeFiles(requestParser.getFilename(), part);
                 }
-                deletePartitionFiles(UPLOAD_DIR, requestParser.getFilename());
+                deletePartitionFiles(UPLOAD_DIR, uuid);
             }
         }
         else
@@ -99,18 +100,19 @@ public class UploadReceiver extends HttpServlet
         {
             int partNum = Integer.parseInt(partNumStr);
             int totalParts = Integer.parseInt(multipartUploadParser.getParams().get("qqtotalparts"));
-
+            String uuid = multipartUploadParser.getParams().get("qquuid");
             String originalFilename = URLDecoder.decode(multipartUploadParser.getParams().get("qqfilename"), "UTF-8");
-            writeFile(requestParser.getUploadItem().getInputStream(), new File(UPLOAD_DIR, originalFilename + "_" + String.format("%05d", partNum)), null);
+
+            writeFile(requestParser.getUploadItem().getInputStream(), new File(UPLOAD_DIR, uuid + "_" + String.format("%05d", partNum)), null);
 
             if (totalParts-1 == partNum)
             {
-                File[] parts = getPartitionFiles(UPLOAD_DIR, originalFilename);
+                File[] parts = getPartitionFiles(UPLOAD_DIR, uuid);
                 for (File part : parts)
                 {
                     mergeFiles(originalFilename, part);
                 }
-                deletePartitionFiles(UPLOAD_DIR, originalFilename);
+                deletePartitionFiles(UPLOAD_DIR, uuid);
             }
         }
         else
