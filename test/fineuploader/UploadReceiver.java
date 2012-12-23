@@ -2,7 +2,6 @@ package fineuploader;
 
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,8 +35,6 @@ public class UploadReceiver extends HttpServlet
     @Override
     public void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException
     {
-        String contentLengthHeader = req.getHeader(CONTENT_LENGTH);
-        Long expectedFileSize = StringUtils.isBlank(contentLengthHeader) ? null : Long.parseLong(contentLengthHeader);
         RequestParser requestParser;
 
         try
@@ -49,13 +46,13 @@ public class UploadReceiver extends HttpServlet
             {
                 MultipartUploadParser multipartUploadParser = new MultipartUploadParser(req, TEMP_DIR, getServletContext());
                 requestParser = RequestParser.getInstance(req, multipartUploadParser);
-                doWriteTempFileForMultipartRequest(requestParser, req, multipartUploadParser);
+                writeFileForMultipartRequest(requestParser, multipartUploadParser);
                 writeResponse(resp.getWriter(), requestParser.generateError() ? "Generated error" : null);
             }
             else
             {
                 requestParser = RequestParser.getInstance(req, null);
-                writeToTempFile(req.getInputStream(), new File(UPLOAD_DIR, requestParser.getFilename()), expectedFileSize);
+                writeFileForNonMultipartRequest(req, requestParser);
                 writeResponse(resp.getWriter(), requestParser.generateError() ? "Generated error" : null);
             }
         } catch (Exception e)
@@ -65,8 +62,37 @@ public class UploadReceiver extends HttpServlet
         }
     }
 
+    private void writeFileForNonMultipartRequest(HttpServletRequest req, RequestParser requestParser) throws Exception
+    {
+        String contentLengthHeader = req.getHeader(CONTENT_LENGTH);
+        long expectedFileSize = Long.parseLong(contentLengthHeader);
 
-    private void doWriteTempFileForMultipartRequest(RequestParser requestParser, HttpServletRequest req, MultipartUploadParser multipartUploadParser) throws Exception
+        String partNumStr = req.getParameter("qqpartnum");
+        if (partNumStr != null)
+        {
+            int partNum = Integer.parseInt(partNumStr);
+            int totalParts = Integer.parseInt(req.getParameter("qqtotalparts"));
+
+            writeFile(req.getInputStream(), new File(UPLOAD_DIR, requestParser.getFilename() + "_" + String.format("%05d", partNum)), null);
+
+            if (totalParts-1 == partNum)
+            {
+                File[] parts = getPartitionFiles(UPLOAD_DIR, requestParser.getFilename());
+                for (File part : parts)
+                {
+                    mergeFiles(requestParser.getFilename(), part);
+                }
+                deletePartitionFiles(UPLOAD_DIR, requestParser.getFilename());
+            }
+        }
+        else
+        {
+            writeFile(req.getInputStream(), new File(UPLOAD_DIR, requestParser.getFilename()), expectedFileSize);
+        }
+    }
+
+
+    private void writeFileForMultipartRequest(RequestParser requestParser, MultipartUploadParser multipartUploadParser) throws Exception
     {
         String partNumStr = multipartUploadParser.getParams().get("qqpartnum");
         if (partNumStr != null)
@@ -75,7 +101,7 @@ public class UploadReceiver extends HttpServlet
             int totalParts = Integer.parseInt(multipartUploadParser.getParams().get("qqtotalparts"));
 
             String originalFilename = URLDecoder.decode(multipartUploadParser.getParams().get("qqfilename"), "UTF-8");
-            writeToTempFile(requestParser.getUploadItem().getInputStream(), new File(UPLOAD_DIR, originalFilename + "_" + String.format("%05d", partNum)), null);
+            writeFile(requestParser.getUploadItem().getInputStream(), new File(UPLOAD_DIR, originalFilename + "_" + String.format("%05d", partNum)), null);
 
             if (totalParts-1 == partNum)
             {
@@ -89,9 +115,10 @@ public class UploadReceiver extends HttpServlet
         }
         else
         {
-            writeToTempFile(requestParser.getUploadItem().getInputStream(), new File(UPLOAD_DIR, requestParser.getFilename()), null);
+            writeFile(requestParser.getUploadItem().getInputStream(), new File(UPLOAD_DIR, requestParser.getFilename()), null);
         }
     }
+
 
     private static class PartitionFilesFilter implements FilenameFilter
     {
@@ -145,7 +172,7 @@ public class UploadReceiver extends HttpServlet
    		return outputFile;
    	}
 
-    private File writeToTempFile(InputStream in, File out, Long expectedFileSize) throws IOException
+    private File writeFile(InputStream in, File out, Long expectedFileSize) throws IOException
     {
         FileOutputStream fos = null;
 
