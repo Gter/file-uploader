@@ -14,6 +14,7 @@ qq.FineUploaderBasic = function(o){
             customHeaders: {},
             forceMultipart: false,
             inputName: 'qqfile',
+            uuidName: 'qquuid',
             chunking: {
                 enabled: false,
                 partSize: 2000000,
@@ -167,6 +168,9 @@ qq.FineUploaderBasic.prototype = {
             this._uploadFileList(verifiedFilesOrInputs);
         }
     },
+    getUuid: function(fileId) {
+        return this._handler.getUuid(fileId);
+    },
     _createUploadButton: function(element){
         var self = this;
 
@@ -201,6 +205,7 @@ qq.FineUploaderBasic.prototype = {
             maxConnections: this._options.maxConnections,
             customHeaders: this._options.request.customHeaders,
             inputName: this._options.request.inputName,
+            uuidParamName: this._options.request.uuidName,
             demoMode: this._options.demoMode,
             log: this.log,
             paramsInBody: this._options.request.paramsInBody,

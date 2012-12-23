@@ -5,7 +5,8 @@
 qq.UploadHandlerForm = function(o){
     qq.UploadHandlerAbstract.apply(this, arguments);
 
-    this._inputs = {};
+    this._inputs = [];
+    this._uuids = [];
     this._detach_load_events = {};
 };
 // @inherits qq.UploadHandlerAbstract
@@ -16,6 +17,7 @@ qq.extend(qq.UploadHandlerForm.prototype, {
         fileInput.setAttribute('name', this._options.inputName);
 
         var id = this._inputs.push(fileInput) - 1;
+        this._uuids[id] = qq.getUniqueId();
 
         // remove file input from DOM
         if (fileInput.parentNode){
@@ -33,13 +35,18 @@ qq.extend(qq.UploadHandlerForm.prototype, {
     },
     reset: function() {
         qq.UploadHandlerAbstract.prototype.reset.apply(this, arguments);
-        this._inputs = {};
+        this._inputs = [];
+        this._uuids = [];
         this._detach_load_events = {};
+    },
+    getUuid: function(id) {
+        return this._uuids[id];
     },
     _cancel: function(id){
         this._options.onCancel(id, this.getName(id));
 
         delete this._inputs[id];
+        delete this._uuids[id];
         delete this._detach_load_events[id];
 
         var iframe = document.getElementById(id);
@@ -63,7 +70,7 @@ qq.extend(qq.UploadHandlerForm.prototype, {
         var fileName = this.getName(id);
 
         var iframe = this._createIframe(id);
-        var form = this._createForm(iframe, this._options.paramsStore.getParams(id));
+        var form = this._createForm(id, iframe);
         form.appendChild(input);
 
         var self = this;
@@ -174,7 +181,11 @@ qq.extend(qq.UploadHandlerForm.prototype, {
     /**
      * Creates form, that will be submitted to iframe
      */
-    _createForm: function(iframe, params){
+    _createForm: function(id, iframe){
+        var params = this._options.paramsStore.getParams(id);
+
+        params[this._options.uuidParamName] = this._uuids[id];
+
         // We can't use the following code in IE6
         // var form = document.createElement('form');
         // form.setAttribute('method', 'post');

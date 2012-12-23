@@ -6,6 +6,7 @@ qq.UploadHandlerXhr = function(o){
     qq.UploadHandlerAbstract.apply(this, arguments);
 
     this._files = [];
+    this._uuids = [];
     this._xhrs = [];
 
     this._remainingChunks = [];
@@ -27,7 +28,11 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
             throw new Error('Passed obj in not a File (in qq.UploadHandlerXhr)');
         }
 
-        return this._files.push(file) - 1;
+
+        var id = this._files.push(file) - 1;
+        this._uuids[id] = qq.getUniqueId();
+
+        return id;
     },
     getName: function(id){
         var file = this._files[id];
@@ -51,9 +56,13 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
     reset: function() {
         qq.UploadHandlerAbstract.prototype.reset.apply(this, arguments);
         this._files = [];
+        this._uuids = [];
         this._xhrs = [];
         this._loaded = [];
         this._remainingChunks = []
+    },
+    getUuid: function(id) {
+        return this._uuids[id];
     },
     /**
      * Sends the file identified by id to the server
@@ -201,6 +210,8 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
             url = this._options.endpoint,
             name = this.getName(id);
 
+        params[this._options.uuidParamName] = this._uuids[id];
+
         //build query string
         if (!this._options.paramsInBody) {
             params[this._options.inputName] = name;
@@ -299,17 +310,18 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
         var name = this.getName(id);
 
         this._options.onComplete(id, name, response, xhr);
-        this._xhrs[id] = null;
+        delete this._xhrs[id];
         this._dequeue(id);
     },
     _cancel: function(id){
         this._options.onCancel(id, this.getName(id));
 
-        this._files[id] = null;
+        delete this._files[id];
+        delete this._uuids[id];
 
         if (this._xhrs[id]){
             this._xhrs[id].abort();
-            this._xhrs[id] = null;
+            delete this._xhrs[id];
         }
 
         this._remainingChunks[id] = [];

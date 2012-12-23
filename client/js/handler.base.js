@@ -9,6 +9,7 @@ qq.UploadHandlerAbstract = function(o){
         paramsInBody: false,
         // maximum number of concurrent uploads
         maxConnections: 999,
+        uuidParamName: 'qquuid',
         chunking: {
             enabled: false,
             partSize: 2000000,
@@ -98,6 +99,7 @@ qq.UploadHandlerAbstract.prototype = {
         this.log('Resetting upload handler');
         this._queue = [];
     },
+    getUuid: function(id) {},
     /**
      * Actual upload method
      */
