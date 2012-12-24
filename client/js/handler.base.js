@@ -14,8 +14,7 @@ qq.UploadHandler = function(o) {
         debug: false,
         endpoint: '/upload.php',
         paramsInBody: false,
-        // maximum number of concurrent uploads
-        maxConnections: 3,
+        maxConnections: 3, // maximum number of concurrent uploads
         uuidParamName: 'qquuid',
         chunking: {
             enabled: false,
@@ -40,9 +39,14 @@ qq.UploadHandler = function(o) {
     };
     qq.extend(options, o);
 
-    queue = [];
-
     log = options.log;
+
+    if (qq.isXhrUploadSupported()) {
+        handlerImpl = new qq.UploadHandlerXhr(options, dequeue, log);
+    }
+    else {
+        handlerImpl = new qq.UploadHandlerForm(options, dequeue, log);
+    }
 
     /**
      * Removes element from queue, starts upload of next
@@ -59,13 +63,6 @@ qq.UploadHandler = function(o) {
             handlerImpl.upload(nextId);
         }
     };
-
-    if (qq.isXhrUploadSupported()) {
-        handlerImpl = new qq.UploadHandlerXhr(options, dequeue, log);
-    }
-    else {
-        handlerImpl = new qq.UploadHandlerForm(options, dequeue, log);
-    }
 
     return {
         /**

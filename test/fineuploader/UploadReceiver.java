@@ -70,6 +70,7 @@ public class UploadReceiver extends HttpServlet
         String partNumStr = req.getParameter("qqpartnum");
         if (partNumStr != null)
         {
+            int totalFileSize = Integer.parseInt(req.getParameter("qqtotalfilesize"));
             int partNum = Integer.parseInt(partNumStr);
             int totalParts = Integer.parseInt(req.getParameter("qqtotalparts"));
             String uuid = req.getParameter("qquuid");
@@ -81,7 +82,7 @@ public class UploadReceiver extends HttpServlet
                 File[] parts = getPartitionFiles(UPLOAD_DIR, uuid);
                 for (File part : parts)
                 {
-                    mergeFiles(requestParser.getFilename(), part);
+                    mergeFiles(requestParser.getFilename(), part, totalFileSize);
                 }
                 deletePartitionFiles(UPLOAD_DIR, uuid);
             }
@@ -98,6 +99,7 @@ public class UploadReceiver extends HttpServlet
         String partNumStr = multipartUploadParser.getParams().get("qqpartnum");
         if (partNumStr != null)
         {
+            int totalFileSize = Integer.parseInt(multipartUploadParser.getParams().get("qqtotalfilesize"));
             int partNum = Integer.parseInt(partNumStr);
             int totalParts = Integer.parseInt(multipartUploadParser.getParams().get("qqtotalparts"));
             String uuid = multipartUploadParser.getParams().get("qquuid");
@@ -110,7 +112,7 @@ public class UploadReceiver extends HttpServlet
                 File[] parts = getPartitionFiles(UPLOAD_DIR, uuid);
                 for (File part : parts)
                 {
-                    mergeFiles(originalFilename, part);
+                    mergeFiles(originalFilename, part, totalFileSize);
                 }
                 deletePartitionFiles(UPLOAD_DIR, uuid);
             }
@@ -153,7 +155,7 @@ public class UploadReceiver extends HttpServlet
         }
     }
 
-    private File mergeFiles(String filename, File partFile) throws Exception
+    private File mergeFiles(String filename, File partFile, int totalFileSize) throws Exception
    	{
    		File outputFile = new File(UPLOAD_DIR, filename);
    		FileOutputStream fos;
@@ -170,6 +172,11 @@ public class UploadReceiver extends HttpServlet
    		fos.flush();
    		fis.close();
    		fos.close();
+
+        if (totalFileSize != outputFile.length())
+        {
+            throw new Exception("Incorrect combined file size!");
+        }
 
    		return outputFile;
    	}
