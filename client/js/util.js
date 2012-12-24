@@ -1,4 +1,5 @@
 /*globals window, navigator, document, FormData, File, HTMLInputElement, XMLHttpRequest*/
+/*jslint white: true*/
 var qq = function(element) {
     "use strict";
 
@@ -254,6 +255,7 @@ qq.getUniqueId = function(){
     "use strict";
 
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        /*jslint eqeq: true, bitwise: true*/
         var r = Math.random()*16|0, v = c == 'x' ? r : (r&0x3|0x8);
         return v.toString(16);
     });

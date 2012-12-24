@@ -1,4 +1,5 @@
 /*globals qq, document*/
+/*jslint white: true*/
 qq.DragAndDrop = function(o) {
     "use strict";
 

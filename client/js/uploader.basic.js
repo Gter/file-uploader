@@ -190,16 +190,9 @@ qq.FineUploaderBasic.prototype = {
         return button;
     },
     _createUploadHandler: function(){
-        var self = this,
-            handlerClass;
+        var self = this;
 
-        if(qq.isXhrUploadSupported()){
-            handlerClass = 'UploadHandlerXhr';
-        } else {
-            handlerClass = 'UploadHandlerForm';
-        }
-
-        var handler = new qq[handlerClass]({
+        return new qq.UploadHandler({
             debug: this._options.debug,
             endpoint: this._options.request.endpoint,
             forceMultipart: this._options.request.forceMultipart,
@@ -208,10 +201,12 @@ qq.FineUploaderBasic.prototype = {
             inputName: this._options.request.inputName,
             uuidParamName: this._options.request.uuidName,
             demoMode: this._options.demoMode,
-            log: this.log,
             paramsInBody: this._options.request.paramsInBody,
             paramsStore: this._paramsStore,
             chunking: this._options.request.chunking,
+            log: function(str, level) {
+                self.log(str, level);
+            },
             onProgress: function(id, fileName, loaded, total){
                 self._onProgress(id, fileName, loaded, total);
                 self._options.callbacks.onProgress(id, fileName, loaded, total);
@@ -250,8 +245,6 @@ qq.FineUploaderBasic.prototype = {
                 }
             }
         });
-
-        return handler;
     },
     _preventLeaveInProgress: function(){
         var self = this;
@@ -290,7 +283,7 @@ qq.FineUploaderBasic.prototype = {
     },
     _onUpload: function(id, fileName){},
     _onInputChange: function(input){
-        if (this._handler instanceof qq.UploadHandlerXhr){
+        if (qq.isXhrUploadSupported()){
             this.addFiles(input.files);
         } else {
             if (this._validateFile(input)){

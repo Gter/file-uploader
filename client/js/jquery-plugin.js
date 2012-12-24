@@ -1,4 +1,5 @@
 /*globals jQuery, qq*/
+/*jslint white: true*/
 (function($) {
     "use strict";
     var uploader, $el, init, dataStore, pluginOption, pluginOptions, addCallbacks, transformVariables, isValidCommand,
