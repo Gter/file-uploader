@@ -80,10 +80,17 @@ public class UploadReceiver extends HttpServlet
             if (totalParts-1 == partNum)
             {
                 File[] parts = getPartitionFiles(UPLOAD_DIR, uuid);
+                File outputFile = new File(UPLOAD_DIR, requestParser.getFilename());
                 for (File part : parts)
                 {
-                    mergeFiles(requestParser.getFilename(), part, totalFileSize);
+                    mergeFiles(outputFile, part);
                 }
+
+                if (totalFileSize != outputFile.length())
+                {
+                    throw new Exception("Incorrect combined file size!");
+                }
+
                 deletePartitionFiles(UPLOAD_DIR, uuid);
             }
         }
@@ -110,10 +117,17 @@ public class UploadReceiver extends HttpServlet
             if (totalParts-1 == partNum)
             {
                 File[] parts = getPartitionFiles(UPLOAD_DIR, uuid);
+                File outputFile = new File(UPLOAD_DIR, originalFilename);
                 for (File part : parts)
                 {
-                    mergeFiles(originalFilename, part, totalFileSize);
+                    mergeFiles(outputFile, part);
                 }
+
+                if (totalFileSize != outputFile.length())
+                {
+                    throw new Exception("Incorrect combined file size!");
+                }
+
                 deletePartitionFiles(UPLOAD_DIR, uuid);
             }
         }
@@ -155,9 +169,8 @@ public class UploadReceiver extends HttpServlet
         }
     }
 
-    private File mergeFiles(String filename, File partFile, int totalFileSize) throws Exception
+    private File mergeFiles(File outputFile, File partFile) throws Exception
    	{
-   		File outputFile = new File(UPLOAD_DIR, filename);
    		FileOutputStream fos;
    		FileInputStream fis;
    		byte[] fileBytes;
@@ -172,11 +185,6 @@ public class UploadReceiver extends HttpServlet
    		fos.flush();
    		fis.close();
    		fos.close();
-
-        if (totalFileSize != outputFile.length())
-        {
-            throw new Exception("Incorrect combined file size!");
-        }
 
    		return outputFile;
    	}

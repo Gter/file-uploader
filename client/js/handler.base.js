@@ -41,13 +41,6 @@ qq.UploadHandler = function(o) {
 
     log = options.log;
 
-    if (qq.isXhrUploadSupported()) {
-        handlerImpl = new qq.UploadHandlerXhr(options, dequeue, log);
-    }
-    else {
-        handlerImpl = new qq.UploadHandlerForm(options, dequeue, log);
-    }
-
     /**
      * Removes element from queue, starts upload of next
      */
@@ -63,6 +56,14 @@ qq.UploadHandler = function(o) {
             handlerImpl.upload(nextId);
         }
     };
+
+    if (qq.isXhrUploadSupported()) {
+        handlerImpl = new qq.UploadHandlerXhr(options, dequeue, log);
+    }
+    else {
+        handlerImpl = new qq.UploadHandlerForm(options, dequeue, log);
+    }
+
 
     return {
         /**
