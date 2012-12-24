@@ -34,7 +34,10 @@ $(document).ready(function() {
             showButton: true
         }
     })
-        .on('error', errorHandler);
+        .on('error', errorHandler)
+        .on('uploadChunk', function(event, id, fileName, chunkData) {
+            qq.log('onUploadChunk -  ID: ' + id + ", FILENAME: " + fileName + ", PARTINDEX: " + chunkData.partIndex + ", STARTBYTE: " + chunkData.startByte + ", ENDBYTE: " + chunkData.endByte + ", PARTCOUNT: " + chunkData.totalParts);
+        });
 
 
     $('#manualUploadModeExample').fineUploader({

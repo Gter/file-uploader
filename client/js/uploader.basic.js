@@ -38,7 +38,8 @@ qq.FineUploaderBasic = function(o){
             onSubmit: function(id, fileName){}, // return false to cancel submit
             onComplete: function(id, fileName, responseJSON){},
             onCancel: function(id, fileName){},
-            onUpload: function(id, fileName, xhr){},
+            onUpload: function(id, fileName){},
+            onUploadChunk: function(id, fileName, chunkData){},
             onProgress: function(id, fileName, loaded, total){},
             onError: function(id, fileName, reason) {},
             onAutoRetry: function(id, fileName, attemptNumber) {},
@@ -223,9 +224,12 @@ qq.FineUploaderBasic.prototype = {
                 self._onCancel(id, fileName);
                 self._options.callbacks.onCancel(id, fileName);
             },
-            onUpload: function(id, fileName, xhr){
-                self._onUpload(id, fileName, xhr);
-                self._options.callbacks.onUpload(id, fileName, xhr);
+            onUpload: function(id, fileName){
+                self._onUpload(id, fileName);
+                self._options.callbacks.onUpload(id, fileName);
+            },
+            onUploadChunk: function(id, fileName, chunkData){
+                self._options.callbacks.onUploadChunk(id, fileName, chunkData);
             },
             onAutoRetry: function(id, fileName, responseJSON, xhr) {
                 self._preventRetries[id] = responseJSON[self._options.retry.preventRetryResponseProperty];
@@ -284,8 +288,7 @@ qq.FineUploaderBasic.prototype = {
             this._storedFileIds.splice(storedFileIndex, 1);
         }
     },
-    _onUpload: function(id, fileName, xhr){
-    },
+    _onUpload: function(id, fileName){},
     _onInputChange: function(input){
         if (this._handler instanceof qq.UploadHandlerXhr){
             this.addFiles(input.files);

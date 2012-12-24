@@ -60,7 +60,7 @@ qq.extend(qq.UploadHandlerForm.prototype, {
         }
     },
     _upload: function(id){
-        this._options.onUpload(id, this.getName(id), false);
+        this._options.onUpload(id, this.getName(id));
         var input = this._inputs[id];
 
         if (!input){

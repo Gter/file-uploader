@@ -76,7 +76,7 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
             params,
             toSend;
 
-        this._options.onUpload(id, this.getName(id), true);
+        this._options.onUpload(id, this.getName(id));
 
         this._loaded[id] = 0;
 
@@ -113,8 +113,7 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
             size = this.getSize(id),
             self = this,
             name = this.getName(id),
-            params = this._options.paramsStore.getParams(id),
-            toSend;
+            toSend, params;
 
         xhr.onreadystatechange = this._getReadyStateChangeHandler(id, xhr);
 
@@ -125,12 +124,20 @@ qq.extend(qq.UploadHandlerXhr.prototype, {
             }
         };
 
+        this._options.onUploadChunk(id, name, {
+            partIndex: chunkData.part,
+            startByte: chunkData.start + 1,
+            endByte: chunkData.end,
+            totalParts: chunkData.count
+        });
+
+        params = this._options.paramsStore.getParams(id);
         this._addChunkingSpecificParams(id, params);
 
         toSend = this._setParamsAndGetEntityToSend(params, xhr, chunkData.blob, id);
         this._setHeaders(id, xhr);
 
-        this.log('Sending chunked upload request for ' + id + ": bytes " + chunkData.start + "-" + chunkData.end + " of " + size);
+        this.log('Sending chunked upload request for ' + id + ": bytes " + (chunkData.start+1) + "-" + chunkData.end + " of " + size);
         xhr.send(toSend);
     },
     _addChunkingSpecificParams: function(id, params) {

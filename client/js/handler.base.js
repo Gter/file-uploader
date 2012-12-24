@@ -26,7 +26,8 @@ qq.UploadHandlerAbstract = function(o){
         onProgress: function(id, fileName, loaded, total){},
         onComplete: function(id, fileName, response, xhr){},
         onCancel: function(id, fileName){},
-        onUpload: function(id, fileName, xhr){},
+        onUpload: function(id, fileName){},
+        onUploadChunk: function(id, fileName, chunkData){},
         onAutoRetry: function(id, fileName, response, xhr){}
 
     };
